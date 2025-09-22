@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Indikator Asam-Basa</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #1a237e, #3949ab);
+            font-family: 'Arial', sans-serif;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            max-width: 300px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #64b5f6;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin-bottom: 8px;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #64b5f6;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        select {
+            width: 100%;
+            padding: 8px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #1976d2, #42a5f5);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 3px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            font-size: 12px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        button.active {
+            background: linear-gradient(45deg, #388e3c, #66bb6a);
+        }
+        
+        #phDisplay {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 15px;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            min-width: 120px;
+        }
+        
+        #colorGuide {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .ph-scale {
+            display: flex;
+            height: 20px;
+            width: 280px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .ph-segment {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }
+        
+        #info {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            max-width: 250px;
+        }
+        
+        .indicator-info {
+            background: rgba(33, 150, 243, 0.2);
+            padding: 8px;
+            border-radius: 5px;
+            margin: 5px 0;
+            border-left: 3px solid #2196f3;
+        }
+        
+        .dipping-animation {
+            animation: dip 2s ease-in-out;
+        }
+        
+        @keyframes dip {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(100px); }
+            100% { transform: translateY(0); }
+        }
+        
+        .color-transition {
+            transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="controls">
+            <h3 style="margin-top: 0; color: #64b5f6;">Kontrol Indikator</h3>
+            
+            <div class="control-group">
+                <label>pH Larutan:</label>
+                <input type="range" id="phSlider" min="0" max="14" value="7" step="0.5">
+                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                    <span>0 (Asam)</span>
+                    <span>7 (Netral)</span>
+                    <span>14 (Basa)</span>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label>Jenis Indikator:</label>
+                <select id="indicatorType">
+                    <option value="lakmus">Kertas Lakmus</option>
+                    <option value="universal">Indikator Universal</option>
+                    <option value="fenolftalein">Fenolftalein</option>
+                    <option value="metilJingga">Metil Jingga</option>
+                    <option value="bromtimolBiru">Bromtimol Biru</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <button onclick="autoDemo()">🔄 Demo Otomatis</button>
+                <button onclick="dipIndicator()">🧪 Celup Indikator</button>
+                <button onclick="resetScene()">↺ Reset</button>
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="showMolecules" style="margin-right: 8px;">
+                    Tampilkan Struktur Molekul
+                </label>
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="showAnimation" checked style="margin-right: 8px;">
+                    Animasi Perubahan Warna
+                </label>
+            </div>
+        </div>
+        
+        <div id="phDisplay">
+            pH: <span id="phValue">7.0</span>
+        </div>
+        
+        <div id="colorGuide">
+            <h4 style="margin-top: 0; color: #64b5f6;">Skala pH</h4>
+            <div class="ph-scale">
+                <div class="ph-segment" style="background: #d32f2f;">1</div>
+                <div class="ph-segment" style="background: #f57c00;">3</div>
+                <div class="ph-segment" style="background: #fbc02d;">5</div>
+                <div class="ph-segment" style="background: #689f38;">7</div>
+                <div class="ph-segment" style="background: #1976d2;">9</div>
+                <div class="ph-segment" style="background: #303f9f;">11</div>
+                <div class="ph-segment" style="background: #7b1fa2;">13</div>
+            </div>
+            <p style="font-size: 12px; margin: 5px 0;">Asam ← Netral → Basa</p>
+        </div>
+        
+        <div id="info">
+            <div id="indicatorInfo" class="indicator-info">
+                <strong>Kertas Lakmus</strong><br>
+                • Asam: Merah<br>
+                • Basa: Biru<br>
+                • Range: pH 4.5-8.3
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variabel global
+        let scene, camera, renderer;
+        let beaker, liquid, indicatorPaper;
+        let moleculeGroup, particleSystem;
+        let currentPH = 7.0;
+        let currentIndicator = 'lakmus';
+        let isDipping = false;
+        let autoMode = false;
+        let colorTransitionTime = 0;
+        
+        // Definisi indikator
+        const indicators = {
+            lakmus: {
+                name: 'Kertas Lakmus',
+                colors: {
+                    acidic: 0xff4444,   // Merah
+                    neutral: 0xffaaaa,  // Merah muda
+                    basic: 0x4444ff     // Biru
+                },
+                transitions: [4.5, 8.3],
+                info: '• Asam: Merah<br>• Basa: Biru<br>• Range: pH 4.5-8.3'
+            },
+            universal: {
+                name: 'Indikator Universal',
+                colors: {
+                    1: 0xd32f2f, 2: 0xe57373, 3: 0xf57c00, 4: 0xffa726,
+                    5: 0xfbc02d, 6: 0xdce775, 7: 0x689f38, 8: 0x66bb6a,
+                    9: 0x42a5f5, 10: 0x1976d2, 11: 0x303f9f, 12: 0x512da8,
+                    13: 0x7b1fa2, 14: 0x8e24aa
+                },
+                info: '• Spektrum lengkap pH 1-14<br>• Perubahan warna bertahap<br>• Akurasi tinggi'
+            },
+            fenolftalein: {
+                name: 'Fenolftalein',
+                colors: {
+                    acidic: 0xffffff,   // Tak berwarna
+                    neutral: 0xffffff,  // Tak berwarna
+                    basic: 0xff69b4     // Merah muda
+                },
+                transitions: [8.2, 10.0],
+                info: '• pH < 8.2: Tak berwarna<br>• pH > 10: Merah muda<br>• Indikator basa'
+            },
+            metilJingga: {
+                name: 'Metil Jingga',
+                colors: {
+                    acidic: 0xff0000,   // Merah
+                    neutral: 0xffaa00,  // Oranye
+                    basic: 0xffff00     // Kuning
+                },
+                transitions: [3.1, 4.4],
+                info: '• pH < 3.1: Merah<br>• pH > 4.4: Kuning<br>• Indikator asam'
+            },
+            bromtimolBiru: {
+                name: 'Bromtimol Biru',
+                colors: {
+                    acidic: 0xffff00,   // Kuning
+                    neutral: 0x00ff00,  // Hijau
+                    basic: 0x0000ff     // Biru
+                },
+                transitions: [6.0, 7.6],
+                info: '• pH < 6.0: Kuning<br>• pH > 7.6: Biru<br>• Range sempit'
+            }
+        };
+        
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x001122);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 2, 8);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('container').appendChild(renderer.domElement);
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 5);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+            
+            const pointLight = new THREE.PointLight(0x64b5f6, 0.6, 50);
+            pointLight.position.set(0, 5, 5);
+            scene.add(pointLight);
+            
+            createBeakerAndLiquid();
+            createIndicatorPaper();
+            createMoleculeVisualization();
+            setupControls();
+            
+            animate();
+        }
+        
+        function createBeakerAndLiquid() {
+            // Beaker (gelas kimia)
+            const beakerGeometry = new THREE.CylinderGeometry(2, 2.2, 4, 32, 1, true);
+            const beakerMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.3,
+                side: THREE.DoubleSide
+            });
+            beaker = new THREE.Mesh(beakerGeometry, beakerMaterial);
+            beaker.position.set(0, -1, 0);
+            scene.add(beaker);
+            
+            // Liquid inside beaker
+            const liquidGeometry = new THREE.CylinderGeometry(1.9, 2.1, 3.5, 32);
+            const liquidMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x689f38,
+                transparent: true,
+                opacity: 0.7,
+                shininess: 100
+            });
+            liquid = new THREE.Mesh(liquidGeometry, liquidMaterial);
+            liquid.position.set(0, -1.25, 0);
+            scene.add(liquid);
+            
+            // Beaker base
+            const baseGeometry = new THREE.CylinderGeometry(2.2, 2.2, 0.1, 32);
+            const baseMaterial = new THREE.MeshPhongMaterial({ color: 0xcccccc });
+            const base = new THREE.Mesh(baseGeometry, baseMaterial);
+            base.position.set(0, -3.05, 0);
+            scene.add(base);
+            
+            // Graduation marks
+            for (let i = 1; i <= 4; i++) {
+                const markGeometry = new THREE.RingGeometry(2.15, 2.25, 32);
+                const markMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0x333333,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const mark = new THREE.Mesh(markGeometry, markMaterial);
+                mark.position.set(0, -3 + i * 0.7, 0);
+                mark.rotation.x = Math.PI / 2;
+                scene.add(mark);
+            }
+        }
+        
+        function createIndicatorPaper() {
+            // Kertas indikator
+            const paperGeometry = new THREE.BoxGeometry(0.3, 2, 0.05);
+            const paperMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xffaaaa,
+                shininess: 30
+            });
+            indicatorPaper = new THREE.Mesh(paperGeometry, paperMaterial);
+            indicatorPaper.position.set(3, 2, 0);
+            indicatorPaper.castShadow = true;
+            scene.add(indicatorPaper);
+            
+            // Tweezers/penjepit
+            const tweezersGeometry = new THREE.BoxGeometry(0.1, 1.5, 0.1);
+            const tweezersMatertial = new THREE.MeshPhongMaterial({ color: 0x444444 });
+            const tweezers = new THREE.Mesh(tweezersGeometry, tweezersMatertial);
+            tweezers.position.set(3.3, 3, 0);
+            scene.add(tweezers);
+        }
+        
+        function createMoleculeVisualization() {
+            moleculeGroup = new THREE.Group();
+            moleculeGroup.visible = false;
+            scene.add(moleculeGroup);
+            
+            // Simplified molecular structure - akan diupdate berdasarkan indikator
+            updateMolecularStructure();
+        }
+        
+        function updateMolecularStructure() {
+            // Clear existing molecules
+            while(moleculeGroup.children.length > 0) {
+                moleculeGroup.remove(moleculeGroup.children[0]);
+            }
+            
+            if (!document.getElementById('showMolecules').checked) return;
+            
+            // Create simplified molecular representation
+            for (let i = 0; i < 5; i++) {
+                const atomGeometry = new THREE.SphereGeometry(0.2, 12, 12);
+                const atomMaterial = new THREE.MeshPhongMaterial({ 
+                    color: Math.random() > 0.5 ? 0xff6b6b : 0x4ecdc4,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const atom = new THREE.Mesh(atomGeometry, atomMaterial);
+                atom.position.set(
+                    (Math.random() - 0.5) * 4,
+                    1 + Math.random() * 2,
+                    (Math.random() - 0.5) * 2
+                );
+                moleculeGroup.add(atom);
+            }
+        }
+        
+        function setupControls() {
+            // pH Slider
+            document.getElementById('phSlider').addEventListener('input', (e) => {
+                currentPH = parseFloat(e.target.value);
+                updatePHDisplay();
+                updateIndicatorColor();
+            });
+            
+            // Indicator Type
+            document.getElementById('indicatorType').addEventListener('change', (e) => {
+                currentIndicator = e.target.value;
+                updateIndicatorInfo();
+                updateIndicatorColor();
+            });
+            
+            // Show molecules checkbox
+            document.getElementById('showMolecules').addEventListener('change', (e) => {
+                moleculeGroup.visible = e.target.checked;
+                if (e.target.checked) {
+                    updateMolecularStructure();
+                }
+            });
+            
+            // Mouse controls
+            let mouseX = 0, mouseY = 0;
+            let isMouseDown = false;
+            
+            renderer.domElement.addEventListener('mousedown', (e) => {
+                isMouseDown = true;
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+            
+            renderer.domElement.addEventListener('mousemove', (e) => {
+                if (isMouseDown) {
+                    const deltaX = e.clientX - mouseX;
+                    const deltaY = e.clientY - mouseY;
+                    
+                    scene.rotation.y += deltaX * 0.01;
+                    scene.rotation.x += deltaY * 0.01;
+                    
+                    mouseX = e.clientX;
+                    mouseY = e.clientY;
+                }
+            });
+            
+            renderer.domElement.addEventListener('mouseup', () => {
+                isMouseDown = false;
+            });
+            
+            renderer.domElement.addEventListener('wheel', (e) => {
+                camera.position.z += e.deltaY * 0.01;
+                camera.position.z = Math.max(4, Math.min(15, camera.position.z));
+            });
+        }
+        
+        function updatePHDisplay() {
+            document.getElementById('phValue').textContent = currentPH.toFixed(1);
+            
+            // Update liquid color based on pH
+            const liquidColor = getPHColor(currentPH);
+            liquid.material.color.setHex(liquidColor);
+            
+            // Update pH display background color
+            const phDisplay = document.getElementById('phDisplay');
+            const displayColor = getPHColor(currentPH);
+            phDisplay.style.background = `linear-gradient(45deg, #${displayColor.toString(16).padStart(6, '0')}, rgba(0,0,0,0.8))`;
+        }
+        
+        function getPHColor(ph) {
+            // Generate color based on pH value
+            if (ph <= 2) return 0xd32f2f;      // Deep red
+            else if (ph <= 4) return 0xf57c00;  // Orange
+            else if (ph <= 6) return 0xfbc02d;  // Yellow
+            else if (ph <= 8) return 0x689f38;  // Green
+            else if (ph <= 10) return 0x1976d2; // Blue
+            else if (ph <= 12) return 0x303f9f; // Dark blue
+            else return 0x7b1fa2;               // Purple
+        }
+        
+        function updateIndicatorColor() {
+            if (!document.getElementById('showAnimation').checked) {
+                setIndicatorColorImmediate();
+                return;
+            }
+            
+            // Animate color transition
+            const targetColor = getIndicatorColor(currentIndicator, currentPH);
+            animateColorTransition(indicatorPaper.material, targetColor, 1500);
+        }
+        
+        function getIndicatorColor(indicatorType, ph) {
+            const indicator = indicators[indicatorType];
+            
+            switch(indicatorType) {
+                case 'lakmus':
+                    if (ph < 4.5) return indicator.colors.acidic;
+                    else if (ph > 8.3) return indicator.colors.basic;
+                    else return indicator.colors.neutral;
+                    
+                case 'universal':
+                    const roundedPH = Math.round(Math.max(1, Math.min(14, ph)));
+                    return indicator.colors[roundedPH] || 0x689f38;
+                    
+                case 'fenolftalein':
+                    if (ph < 8.2) return indicator.colors.acidic;
+                    else if (ph > 10.0) return indicator.colors.basic;
+                    else return indicator.colors.neutral;
+                    
+                case 'metilJingga':
+                    if (ph < 3.1) return indicator.colors.acidic;
+                    else if (ph > 4.4) return indicator.colors.basic;
+                    else return indicator.colors.neutral;
+                    
+                case 'bromtimolBiru':
+                    if (ph < 6.0) return indicator.colors.acidic;
+                    else if (ph > 7.6) return indicator.colors.basic;
+                    else return indicator.colors.neutral;
+                    
+                default:
+                    return 0xffffff;
+            }
+        }
+        
+        function setIndicatorColorImmediate() {
+            const targetColor = getIndicatorColor(currentIndicator, currentPH);
+            indicatorPaper.material.color.setHex(targetColor);
+        }
+        
+        function animateColorTransition(material, targetColor, duration) {
+            const startColor = material.color.clone();
+            const endColor = new THREE.Color(targetColor);
+            const startTime = Date.now();
+            
+            function updateColor() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Smooth easing function
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+                
+                material.color.lerpColors(startColor, endColor, easeProgress);
+                
+                if (progress < 1) {
+                    requestAnimationFrame(updateColor);
+                }
+            }
+            
+            updateColor();
+        }
+        
+        function updateIndicatorInfo() {
+            const info = indicators[currentIndicator].info;
+            const name = indicators[currentIndicator].name;
+            document.getElementById('indicatorInfo').innerHTML = `<strong>${name}</strong><br>${info}`;
+        }
+        
+        function dipIndicator() {
+            if (isDipping) return;
+            
+            isDipping = true;
+            indicatorPaper.classList.add('dipping-animation');
+            
+            // Animate dipping motion
+            const originalY = indicatorPaper.position.y;
+            const targetY = -0.5; // Into the liquid
+            
+            // Down motion
+            animatePosition(indicatorPaper, { y: targetY }, 1000, () => {
+                // Color change happens here
+                updateIndicatorColor();
+                
+                // Up motion after 1 second
+                setTimeout(() => {
+                    animatePosition(indicatorPaper, { y: originalY }, 1000, () => {
+                        isDipping = false;
+                        indicatorPaper.classList.remove('dipping-animation');
+                    });
+                }, 1000);
+            });
+        }
+        
+        function animatePosition(object, target, duration, callback) {
+            const startPos = { ...object.position };
+            const startTime = Date.now();
+            
+            function updatePosition() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+                
+                // Interpolate position
+                for (let axis in target) {
+                    if (startPos[axis] !== undefined) {
+                        object.position[axis] = startPos[axis] + (target[axis] - startPos[axis]) * easeProgress;
+                    }
+                }
+                
+                if (progress < 1) {
+                    requestAnimationFrame(updatePosition);
+                } else if (callback) {
+                    callback();
+                }
+            }
+            
+            updatePosition();
+        }
+        
+        function autoDemo() {
+            if (autoMode) return;
+            
+            autoMode = true;
+            const phValues = [1, 3, 5, 7, 9, 11, 13];
+            let currentIndex = 0;
+            
+            function nextPH() {
+                if (currentIndex < phValues.length) {
+                    const ph = phValues[currentIndex];
+                    currentPH = ph;
+                    document.getElementById('phSlider').value = ph;
+                    updatePHDisplay();
+                    
+                    // Dip indicator
+                    dipIndicator();
+                    
+                    currentIndex++;
+                    setTimeout(nextPH, 3500); // Wait for dipping animation to complete
+                } else {
+                    autoMode = false;
+                }
+            }
+            
+            nextPH();
+        }
+        
+        function resetScene() {
+            currentPH = 7.0;
+            document.getElementById('phSlider').value = 7;
+            currentIndicator = 'lakmus';
+            document.getElementById('indicatorType').value = 'lakmus';
+            
+            updatePHDisplay();
+            updateIndicatorInfo();
+            updateIndicatorColor();
+            
+            // Reset positions
+            indicatorPaper.position.set(3, 2, 0);
+            scene.rotation.set(0, 0, 0);
+            camera.position.set(0, 2, 8);
+            
+            autoMode = false;
+            isDipping = false;
+        }
+        
+        function createParticleEffects() {
+            // Create bubble/sparkle effects when indicator changes color
+            const particleCount = 20;
+            const particles = [];
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particleGeometry = new THREE.SphereGeometry(0.02, 6, 6);
+                const particleMaterial = new THREE.MeshBasicMaterial({ 
+                    color: Math.random() * 0xffffff,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+                
+                particle.position.set(
+                    indicatorPaper.position.x + (Math.random() - 0.5) * 0.5,
+                    indicatorPaper.position.y + (Math.random() - 0.5) * 0.5,
+                    indicatorPaper.position.z + (Math.random() - 0.5) * 0.5
+                );
+                
+                particle.userData = {
+                    velocity: new THREE.Vector3(
+                        (Math.random() - 0.5) * 0.1,
+                        Math.random() * 0.1,
+                        (Math.random() - 0.5) * 0.1
+                    ),
+                    life: 1.0,
+                    decay: 0.02
+                };
+                
+                particles.push(particle);
+                scene.add(particle);
+            }
+            
+            // Animate particles
+            function animateParticles() {
+                particles.forEach((particle, index) => {
+                    particle.position.add(particle.userData.velocity);
+                    particle.userData.life -= particle.userData.decay;
+                    particle.material.opacity = particle.userData.life;
+                    
+                    if (particle.userData.life <= 0) {
+                        scene.remove(particle);
+                        particles.splice(index, 1);
+                    }
+                });
+                
+                if (particles.length > 0) {
+                    requestAnimationFrame(animateParticles);
+                }
+            }
+            
+            animateParticles();
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Rotate molecular visualization
+            if (moleculeGroup.visible) {
+                moleculeGroup.rotation.y += 0.01;
+                moleculeGroup.children.forEach((atom, index) => {
+                    atom.position.y += Math.sin(Date.now() * 0.001 + index) * 0.001;
+                });
+            }
+            
+            // Gentle liquid surface animation
+            liquid.rotation.y += 0.002;
+            
+            // Subtle indicator paper movement
+            if (!isDipping) {
+                indicatorPaper.rotation.z = Math.sin(Date.now() * 0.001) * 0.02;
+            }
+            
+            // Animate beaker rim reflection
+            beaker.material.opacity = 0.3 + Math.sin(Date.now() * 0.002) * 0.05;
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Initialize scene
+        init();
+        updatePHDisplay();
+        updateIndicatorInfo();
+    </script>
+</body>
+</html>
